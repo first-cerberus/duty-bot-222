@@ -1,0 +1,26 @@
+{
+  "name": "dutybot-222",
+  "version": "1.0.0",
+  "description": "Telegram bot for duty management",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "seed": "node src/database/seed.js"
+  },
+  "keywords": [
+    "telegram",
+    "bot",
+    "duty"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "telegraf": "^4.15.0",
+    "mongodb": "^6.3.0",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}
