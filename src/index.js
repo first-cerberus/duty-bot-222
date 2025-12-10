@@ -1,4 +1,5 @@
 const { Telegraf } = require('telegraf');
+const http = require('http');
 const config = require('./config/config');
 const { connectDB } = require('./database/db');
 const { mainMenuKeyboard } = require('./keyboards/mainMenu');
@@ -112,6 +113,32 @@ bot.launch()
     console.error('❌ Error starting bot:', error);
   });
 
+// HTTP сервер для Cloud Run health checks
+const PORT = process.env.PORT || 8080;
+const server = http.createServer((req, res) => {
+  if (req.url === '/health' || req.url === '/') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ 
+      status: 'ok', 
+      bot: 'DutyBOT is running',
+      timestamp: new Date().toISOString()
+    }));
+  } else {
+    res.writeHead(404);
+    res.end('Not Found');
+  }
+});
+
+server.listen(PORT, () => {
+  console.log(`🌐 HTTP server listening on port ${PORT}`);
+});
+
 // Graceful stop
-process.once('SIGINT', () => bot.stop('SIGINT'));
-process.once('SIGTERM', () => bot.stop('SIGTERM'));
+process.once('SIGINT', () => {
+  bot.stop('SIGINT');
+  server.close();
+});
+process.once('SIGTERM', () => {
+  bot.stop('SIGTERM');
+  server.close();
+});
