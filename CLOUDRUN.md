@@ -52,6 +52,16 @@ gcloud run deploy dutybot \
   --cpu 1 \
   --min-instances 1 \
   --max-instances 1
+
+# Після деплою отримайте URL сервісу
+SERVICE_URL=$(gcloud run services describe dutybot --region europe-west1 --format='value(status.url)')
+
+# Оновіть змінну WEBHOOK_DOMAIN
+gcloud run services update dutybot \
+  --region europe-west1 \
+  --set-env-vars "WEBHOOK_DOMAIN=$SERVICE_URL"
+
+echo "✅ Webhook URL: $SERVICE_URL/bot<YOUR_BOT_TOKEN>"
 ```
 
 ### Метод 2: З використанням Docker Image

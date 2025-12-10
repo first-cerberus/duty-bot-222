@@ -1,5 +1,5 @@
 const { Telegraf } = require('telegraf');
-const http = require('http');
+const express = require('express');
 const config = require('./config/config');
 const { connectDB } = require('./database/db');
 const { mainMenuKeyboard } = require('./keyboards/mainMenu');
@@ -105,32 +105,58 @@ bot.action(/assign_duty_user_(\d+)/, checkAdmin, (ctx) => {
 });
 
 // Запуск бота
-bot.launch()
-  .then(() => {
-    console.log('🚀 Bot started successfully!');
-  })
-  .catch((error) => {
-    console.error('❌ Error starting bot:', error);
-  });
+const app = express();
 
-// HTTP сервер для Cloud Run health checks
-const PORT = process.env.PORT || 8080;
-const server = http.createServer((req, res) => {
-  if (req.url === '/health' || req.url === '/') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ 
-      status: 'ok', 
-      bot: 'DutyBOT is running',
-      timestamp: new Date().toISOString()
-    }));
-  } else {
-    res.writeHead(404);
-    res.end('Not Found');
-  }
+// Middleware для обробки JSON
+app.use(express.json());
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    bot: 'DutyBOT is running',
+    mode: config.webhookDomain ? 'webhook' : 'polling',
+    timestamp: new Date().toISOString()
+  });
 });
 
-server.listen(PORT, () => {
-  console.log(`🌐 HTTP server listening on port ${PORT}`);
+app.get('/', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    message: 'DutyBOT Telegram Bot',
+    mode: config.webhookDomain ? 'webhook' : 'polling'
+  });
+});
+
+// Запуск бота в режимі webhook або polling
+if (config.webhookDomain) {
+  // Webhook режим для production (Cloud Run)
+  const webhookPath = `/bot${config.botToken}`;
+  
+  app.use(bot.webhookCallback(webhookPath));
+  
+  bot.telegram.setWebhook(`${config.webhookDomain}${webhookPath}`)
+    .then(() => {
+      console.log('🚀 Bot started in WEBHOOK mode');
+      console.log(`📍 Webhook URL: ${config.webhookDomain}${webhookPath}`);
+    })
+    .catch((error) => {
+      console.error('❌ Error setting webhook:', error);
+    });
+} else {
+  // Polling режим для development
+  bot.launch()
+    .then(() => {
+      console.log('🚀 Bot started in POLLING mode (development)');
+    })
+    .catch((error) => {
+      console.error('❌ Error starting bot:', error);
+    });
+}
+
+// Запуск HTTP сервера
+const server = app.listen(config.port, () => {
+  console.log(`🌐 HTTP server listening on port ${config.port}`);
 });
 
 // Graceful stop
