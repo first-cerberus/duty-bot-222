@@ -2,5 +2,16 @@
 /node_modules
 .dockerignore
 .env
+.env.example
 Dockerfile
 fly.toml
+*.log
+npm-debug.log*
+.DS_Store
+.vscode
+README.md
+.gitignore
+backup.sh
+deploy.sh
+healthcheck.js
+DEPLOYMENT.md

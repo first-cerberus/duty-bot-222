@@ -1,39 +1,49 @@
-# syntax = docker/dockerfile:1
+# Multi-stage build для оптимізації розміру образу
+FROM node:20-alpine AS builder
 
-# Adjust NODE_VERSION as desired
-ARG NODE_VERSION=20.18.0
-FROM node:${NODE_VERSION}-slim AS base
-
-LABEL fly_launch_runtime="Node.js"
-
-# Node.js app lives here
+# Встановлюємо робочу директорію
 WORKDIR /app
 
-# Set production environment
-ENV NODE_ENV="production"
+# Копіюємо package файли
+COPY package*.json ./
 
+# Встановлюємо залежності
+RUN npm ci --only=production
 
-# Throw-away build stage to reduce size of final image
-FROM base AS build
-
-# Install packages needed to build node modules
-RUN apt-get update -qq && \
-    apt-get install --no-install-recommends -y build-essential node-gyp pkg-config python-is-python3
-
-# Install node modules
-COPY package-lock.json package.json ./
-RUN npm ci
-
-# Copy application code
+# Копіюємо весь код
 COPY . .
 
+# Production stage
+FROM node:20-alpine
 
-# Final stage for app image
-FROM base
+# Встановлюємо робочу директорію
+WORKDIR /app
 
-# Copy built application
-COPY --from=build /app /app
+# Копіюємо node_modules та код з builder
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/src ./src
+COPY --from=builder /app/package*.json ./
 
-# Start the server by default, this can be overwritten at runtime
-EXPOSE 3000
-CMD [ "npm", "run", "start" ]
+# Створюємо non-root користувача для безпеки
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001
+
+# Змінюємо власника файлів
+RUN chown -R nodejs:nodejs /app
+
+# Перемикаємось на non-root користувача
+USER nodejs
+
+# Встановлюємо змінні оточення
+ENV NODE_ENV=production
+
+# Cloud Run використовує PORT змінну оточення
+ENV PORT=8080
+EXPOSE 8080
+
+# Healthcheck для Cloud Run
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:8080/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+
+# Запускаємо бота
+CMD ["node", "src/index.js"]
