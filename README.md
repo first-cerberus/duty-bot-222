@@ -20,7 +20,7 @@ npm start
 
 Для режиму розробки:
 ```bash
-npm run dev
+nodemon
 ```
 
 ## Команди бота
