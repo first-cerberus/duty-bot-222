@@ -1,5 +1,4 @@
 const { Telegraf } = require('telegraf');
-const express = require('express');
 const config = require('./config/config');
 const { connectDB } = require('./database/db');
 const { mainMenuKeyboard } = require('./keyboards/mainMenu');
@@ -104,67 +103,23 @@ bot.action(/assign_duty_user_(\d+)/, checkAdmin, (ctx) => {
   handleAssignDutyUser(ctx, userId);
 });
 
-// Запуск бота
-const app = express();
-
-// Middleware для обробки JSON
-app.use(express.json());
-
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    bot: 'DutyBOT is running',
-    mode: config.webhookDomain ? 'webhook' : 'polling',
-    timestamp: new Date().toISOString()
+// Запуск бота в режимі polling
+bot.launch()
+  .then(() => {
+    console.log('🚀 Bot started in POLLING mode');
+    console.log('✅ Bot is running...');
+  })
+  .catch((error) => {
+    console.error('❌ Error starting bot:', error);
+    process.exit(1);
   });
-});
-
-app.get('/', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    message: 'DutyBOT Telegram Bot',
-    mode: config.webhookDomain ? 'webhook' : 'polling'
-  });
-});
-
-// Запуск бота в режимі webhook або polling
-if (config.webhookDomain) {
-  // Webhook режим для production (Cloud Run)
-  const webhookPath = `/bot${config.botToken}`;
-  
-  app.use(bot.webhookCallback(webhookPath));
-  
-  bot.telegram.setWebhook(`${config.webhookDomain}${webhookPath}`)
-    .then(() => {
-      console.log('🚀 Bot started in WEBHOOK mode');
-      console.log(`📍 Webhook URL: ${config.webhookDomain}${webhookPath}`);
-    })
-    .catch((error) => {
-      console.error('❌ Error setting webhook:', error);
-    });
-} else {
-  // Polling режим для development
-  bot.launch()
-    .then(() => {
-      console.log('🚀 Bot started in POLLING mode (development)');
-    })
-    .catch((error) => {
-      console.error('❌ Error starting bot:', error);
-    });
-}
-
-// Запуск HTTP сервера
-const server = app.listen(config.port, () => {
-  console.log(`🌐 HTTP server listening on port ${config.port}`);
-});
 
 // Graceful stop
 process.once('SIGINT', () => {
+  console.log('\n⏹️  Stopping bot...');
   bot.stop('SIGINT');
-  server.close();
 });
 process.once('SIGTERM', () => {
+  console.log('\n⏹️  Stopping bot...');
   bot.stop('SIGTERM');
-  server.close();
 });
