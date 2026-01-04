@@ -84,13 +84,23 @@ async function updateEbashkaStatus(userId, status) {
   const db = getDB();
   const collection = db.collection(COLLECTION_NAME);
   
+  const updateData = {
+    ebashka_status: status,
+    updated_at: new Date()
+  };
+  
+  // Якщо ставимо на дежурство, зберігаємо час початку
+  if (status === 'on_duty') {
+    updateData.duty_start_time = new Date();
+  } else {
+    // Якщо знімаємо з дежурства, видаляємо час початку
+    updateData.duty_start_time = null;
+  }
+  
   const result = await collection.updateOne(
     { id: userId },
     {
-      $set: {
-        ebashka_status: status,
-        updated_at: new Date()
-      }
+      $set: updateData
     }
   );
   
@@ -121,6 +131,48 @@ async function getUsersWithLeastDuties(limit) {
     .toArray();
 }
 
+/**
+ * Автоматично знімає з дежурства користувачів, які на дежурстві більше 8 годин
+ * Викликається планувальником без сповіщень
+ */
+async function autoRemoveFromDuty() {
+  const db = getDB();
+  const collection = db.collection(COLLECTION_NAME);
+  
+  // Отримуємо поточний час мінус 8 годин
+  const eightHoursAgo = new Date(Date.now() - 8 * 60 * 60 * 1000);
+  
+  // Знаходимо користувачів на дежурстві, які були поставлені більше 8 годин тому
+  const usersToRemove = await collection.find({
+    ebashka_status: 'on_duty',
+    duty_start_time: { $lte: eightHoursAgo, $ne: null }
+  }).toArray();
+  
+  // Знімаємо їх з дежурства
+  if (usersToRemove.length > 0) {
+    await collection.updateMany(
+      {
+        ebashka_status: 'on_duty',
+        duty_start_time: { $lte: eightHoursAgo, $ne: null }
+      },
+      {
+        $set: {
+          ebashka_status: 'free',
+          duty_start_time: null,
+          updated_at: new Date()
+        }
+      }
+    );
+    
+    console.log(`Автоматично знято з дежурства ${usersToRemove.length} користувачів:`);
+    usersToRemove.forEach(user => {
+      console.log(`- ${user.fullName}`);
+    });
+  }
+  
+  return usersToRemove;
+}
+
 module.exports = {
   createOrUpdateUser,
   getUserById,
@@ -128,5 +180,6 @@ module.exports = {
   updateEbashkaCount,
   updateEbashkaStatus,
   getUsersByStatus,
-  getUsersWithLeastDuties
+  getUsersWithLeastDuties,
+  autoRemoveFromDuty
 };

@@ -16,6 +16,7 @@ const {
   handleFreeDutyUser,
   handleAssignDutyUser
 } = require('./handlers/dutyHandlers');
+const { autoRemoveFromDuty } = require('./database/models');
 
 // Створення бота
 const bot = new Telegraf(config.botToken);
@@ -108,6 +109,18 @@ bot.launch()
   .then(() => {
     console.log('🚀 Bot started in POLLING mode');
     console.log('✅ Bot is running...');
+    
+    // Запускаємо планувальник для автоматичного зняття з дежурства через 8 годин
+    // Перевірка кожні 60 секунд (1 хвилину)
+    setInterval(async () => {
+      try {
+        await autoRemoveFromDuty();
+      } catch (error) {
+        console.error('❌ Помилка при автоматичному знятті з дежурства:', error);
+      }
+    }, 60 * 1000); // 60 секунд = 1 хвилина
+    
+    console.log('⏰ Планувальник автоматичного зняття з дежурства запущено (перевірка кожну хвилину)');
   })
   .catch((error) => {
     console.error('❌ Error starting bot:', error);
